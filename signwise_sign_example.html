@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>SignWise NPAPI & Chrome Extension Signing Example Page</title>
+  <script src="vendor/signwise.js" type="text/javascript"></script>
+</head>
+<body>
+<h1>SignWise NPAPI & Chrome Extension Signing Example Page</h1>
+<p id="messages"></p>
+<script>
+  function displayMessage(message) {
+    document.getElementById('messages').innerHTML += message + '<br>';
+  }
+
+  function pluginComMessage(error, result) {
+    if (error) {
+      console.log('com error', error);
+      return;
+    }
+    if (typeof result !== 'object' || !result.pluginVersionStatus) {
+      console.log('Invalid com response', result);
+      return;
+    }
+    var pluginVersionStatusMessages = {
+      20: 'We do not support your smart card yet. Please contact customer support.',
+      30: 'You need to update your version of SignWise Plugin to use this smart card.',
+      40: 'An update is available for your SignWise Plugin.',
+      50: 'An important security update is required to use SignWise Plugin.'
+    };
+    if (pluginVersionStatusMessages.hasOwnProperty(result.pluginVersionStatus)) {
+      displayMessage(pluginVersionStatusMessages[result.pluginVersionStatus]);
+    }
+  }
+
+  var pluginConf = {
+    lang: 'et',
+    com: {
+      url: '/plugin/communications',
+      logErrors: true,
+      callback: pluginComMessage
+    }
+  };
+
+  var swPlugin = new SignWisePlugin(pluginConf);
+
+  swPlugin.getSignCertificates(function(err, result) {
+    if (err) {
+      console.log('Error reading signing certificates', err);
+      return;
+    }
+    console.log('Signing certificates', result);
+    var documentHash = '0123456789abcdef0123456789abcdef01234567';
+    var hashType = 'SHA256';
+    swPlugin.sign(documentHash, hashType, function(err, result) {
+      if (err) {
+        console.log('Error signing', err);
+        return;
+      }
+      console.log('Signing successful', result);
+    });
+  });
+
+</script>
+</body>
+</html>

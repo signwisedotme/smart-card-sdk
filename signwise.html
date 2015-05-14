@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>SignWise NPAPI & Chrome Extension Full Test Page</title>
+  <script src="vendor/signwise.js" type="text/javascript"></script>
+  <style>
+    #response {
+      border: 1px solid #bbbbbb;
+      border-bottom: none;
+      margin-bottom: 10px;
+    }
+    #response .row {
+      border-bottom: 1px solid #bbbbbb;
+    }
+    #response .row div {
+      padding: 5px 7px;
+    }
+  </style>
+</head>
+<body>
+<h1>SignWise NPAPI & Chrome Extension Full Test Page</h1>
+<div id="response"></div>
+<label for="is_parallel">Is parallel</label>
+<input type="checkbox" id="is_parallel" />
+<label for="lang">Language:</label>
+<select id="lang"></select>
+<label for="hash">Hash:</label>
+<select id="hash"></select>
+<p>Plugin type: <span id="pluginTypeDisplay"></span></p>
+<p>Plugin version: <span id="pluginVersionDisplay"></span></p>
+<button onclick="run()">Run</button>
+<p id="status"></p>
+<script>
+
+  function pluginCom(error, result) {
+    console.log('com result', result, 'error', error);
+  }
+
+  var swPlugin = new SignWisePlugin({lang: 'et', com: {url: '/plugin/communications', logErrors: true, callback: pluginCom}});
+  var row = 0;
+
+  function populateSelect(id, options) {
+    var sel = document.getElementById(id);
+    sel.options.length = 0;
+    for (var j = 0; j < options.length; j++) {
+      var opt = document.createElement('option');
+      opt.value = options[j];
+      opt.innerText = options[j];
+      sel.appendChild(opt);
+    }
+    sel.selectedIndex = 0;
+  }
+
+  populateSelect('lang', ['et', 'en', 'ru', 'fi', 'lv', 'ar', 'pt', 'fr', 'de', 'nl', 'lt', 'es']);
+  populateSelect('hash', ['sha1', 'sha224', 'sha256']);
+
+  // Display function result in table
+  function makeCallback(command) {
+    row++;
+    var currentRow = row;
+    var tr = document.createElement('DIV');
+    tr.setAttribute('id', 'row' + currentRow);
+    tr.setAttribute('class', 'row');
+    tr.innerHTML = '<div class="cmd">' + command + '</div><div style="color:orange">PENDING</div>';
+    document.getElementById('response').appendChild(tr);
+    return function(error, result) {
+      console.log('command', command, 'error', error, 'result', result, 'result type', typeof result);
+      document.getElementById('row' + currentRow).innerHTML = '<div class="cmd">' + command + '</div><div style="color:' + (error ? 'red' : 'green') + '">' + (error ? 'Error: ' + JSON.stringify(error) : 'Result: ' + result) + '</div>';
+    };
+  }
+
+  function generateDocumentHash(noOfHashes) {
+    var Hashes = "";
+    var shaHash = "abcdef0123456789abcdef0123456789abcdef0123456789ab";
+    for(var i = 0; i < noOfHashes; ++i){
+      if(i!=0) Hashes += ";";
+      Hashes += shaHash;
+    }
+    return Hashes;
+  }
+
+  // Run all commands on plugin
+  function run() {
+    var callbacksReached = 0;
+    document.getElementById('response').innerHTML = "";
+    var e = document.getElementById("lang");
+    swPlugin.lang = e.options[e.selectedIndex].value;
+    var isParallel = document.getElementById("is_parallel").checked;
+    var h = document.getElementById("hash");
+    var hash = h.options[h.selectedIndex].value;
+
+    var functions = [
+      {fn: 'authenticate', params: ['0123456789abcdef0123456789abcdef01234567']},
+      {fn: 'getAuthCertificates'},
+      {fn: 'getSignCertificates'},
+      {fn: 'getSupportedHashTypes'},
+      {fn: 'getVersion'},
+      {fn: 'sign', params: [generateDocumentHash(1), hash]}
+    ];
+
+    function executeNextFunction(i) {
+      var params = functions[i].params || [];
+      var cb = function(error, result) {
+        callbacksReached++;
+        updateStatus();
+        makeCallback(functions[i].fn)(error, result);
+        if (!isParallel && (i != functions.length - 1)) {
+          executeNextFunction(i + 1);
+        }
+      };
+      params.push(cb);
+      swPlugin[functions[i].fn].apply(swPlugin, params);
+      if (isParallel && (i != functions.length - 1)) {
+        executeNextFunction(i + 1);
+      }
+    }
+
+    function updateStatus() {
+      document.getElementById('status').innerHTML = callbacksReached + ' / ' + functions.length + ' done';
+    }
+    executeNextFunction(0);
+    updateStatus();
+  }
+
+  swPlugin.getVersion(function(error, version) {
+    if (error) {
+      console.log('Error getting plugin version', error);
+    }
+    document.getElementById('pluginTypeDisplay').innerHTML = error ? 'error' : swPlugin.isChromeExtension ? 'Chrome Extension' : 'NPAPI';
+    document.getElementById('pluginVersionDisplay').innerHTML = error ? 'error' : version;
+  });
+</script>
+</body>
+</html>

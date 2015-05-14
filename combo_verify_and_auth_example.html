@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>SignWise Plugin & Estonian ID Card Software Verification & Authentication Example Page</title>
+  <script src="vendor/signwise.js" type="text/javascript"></script>
+  <script src="vendor/hwcrypto-legacy.js" type="text/javascript"></script>
+  <script src="vendor/hwcrypto-missing.js" type="text/javascript"></script>
+  <script src="vendor/hwcrypto.js" type="text/javascript"></script>
+</head>
+<body>
+<h1>SignWise Plugin & Estonian ID Card Software Verification & Authentication Example Page</h1>
+<p>Implements both NPAPI and Chrome Extension for both plugins.</p>
+<p id="messages"></p>
+<script>
+  function displayMessage(message) {
+    document.getElementById('messages').innerHTML += message + '<br>';
+  }
+
+  function pluginComMessage(error, result) {
+    if (error) {
+      console.log('com error', error);
+      return;
+    }
+    if (typeof result !== 'object' || !result.pluginVersionStatus) {
+      console.log('Invalid com response', result);
+      return;
+    }
+    var pluginVersionStatusMessages = {
+      20: 'We do not support your smart card yet. Please contact customer support.',
+      30: 'You need to update your version of SignWise Plugin to use this smart card.',
+      40: 'An update is available for your SignWise Plugin.',
+      50: 'An important security update is required to use SignWise Plugin.'
+    };
+    if (pluginVersionStatusMessages.hasOwnProperty(result.pluginVersionStatus)) {
+      displayMessage(pluginVersionStatusMessages[result.pluginVersionStatus]);
+    }
+  }
+
+  var pluginConf = {
+    lang: 'et',
+    com: {
+      url: '/plugin/communications',
+      logErrors: true,
+      callback: pluginComMessage
+    }
+  };
+
+  var swPlugin = new SignWisePlugin(pluginConf);
+
+  swPlugin.getVersion(function(err, result) {
+    if (err) {
+      console.log('SW Plugin not found', err);
+
+      checkEstIdPlugin(function(result) {
+        if (result) {
+          // Estonian ID Card Software was found.
+          // Redirect to the domain or path where the server requires client certificate authentication.
+          location.href = 'https://id.mydomain.com/';
+        } else {
+          displayMessage('No plugin found. Please download SignWise Plugin.');
+        }
+      });
+      return;
+    }
+    console.log('Found SW Plugin version', result);
+    swPlugin.getAuthCertificates(function(err, result) {
+      if (err) {
+        console.log('Error reading authentication certificates', err);
+        return;
+      }
+      console.log('Authentication certificates', result);
+      var challenge = '0123456789abcdef0123456789abcdef01234567';
+      swPlugin.authenticate(challenge, function(err, result) {
+        if (err) {
+          console.log('Error authenticating', err);
+          return;
+        }
+        console.log('Authentication successful', result);
+      });
+    });
+  });
+
+</script>
+</body>
+</html>
