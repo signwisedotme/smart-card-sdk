@@ -299,10 +299,9 @@ if (!Array.prototype.indexOf) {
       var cmdSplitResults = ['getAuthCertificates', 'getAuthenticationCertificate', 'getSignCertificates', 'getSigningCertificate', 'getSupportedHashTypes'];
       if ((-1 !== cmdSplitResults.indexOf(command)) && !error && (typeof result === 'string')) {
         if (command === 'getSupportedHashTypes') {
-          result = result.toUpperCase();
-        }
-        result = result.split(',');
-        if (command !== 'getSupportedHashTypes') {
+          result = result.toUpperCase().split(',');
+        } else {
+          result = result.split(';');
           for (var i = 0; i < result.length; i++) {
             result[i] = toCertFormat(hex2b64(result[i]));
           }
