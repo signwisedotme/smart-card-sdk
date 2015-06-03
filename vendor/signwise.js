@@ -61,6 +61,43 @@ Error codes:
 
 */
 
+if (!Array.prototype.map) {
+  Array.prototype.map = function(fun /*, thisArg */) {
+    "use strict";
+    if (this === void 0 || this === null) throw new TypeError();
+    var t = Object(this);
+    var len = t.length >>> 0;
+    if (typeof fun !== "function") throw new TypeError();
+    var res = new Array(len);
+    var thisArg = arguments.length >= 2 ? arguments[1] : void 0;
+    for (var i = 0; i < len; i++) { if (i in t) res[i] = fun.call(thisArg, t[i], i, t); }
+    return res;
+  };
+}
+
+// Base64 encoder [https://gist.github.com/999166] by [https://github.com/nignag]
+if (typeof btoa === 'undefined' ) {
+  var btoa = function (input) {
+    var str = String(input);
+    function InvalidCharacterError(message) { this.message = message; }
+    InvalidCharacterError.prototype = new Error;
+    InvalidCharacterError.prototype.name = 'InvalidCharacterError';
+    var chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=';
+    for (
+      var block, charCode, idx = 0, map = chars, output = '';
+      str.charAt(idx | 0) || (map = '=', idx % 1);
+      output += map.charAt(63 & block >> 8 - idx % 1 * 8)
+      ) {
+      charCode = str.charCodeAt(idx += 3/4);
+      if (charCode > 0xFF) {
+        throw new InvalidCharacterError("'btoa' failed: The string to be encoded contains characters outside of the Latin1 range.");
+      }
+      block = block << 8 | charCode;
+    }
+    return output;
+  }
+}
+
 if (!Array.prototype.indexOf) {
   Array.prototype.indexOf = function(searchElement, fromIndex) {
     var k; if (this == null) { throw new TypeError('"this" is null or not defined'); }
@@ -94,6 +131,31 @@ if (!Array.prototype.indexOf) {
     this.id = Math.random().toString(36).substr(2);
     this.lang = opts.lang;
     this.com = opts.com;
+  }
+
+
+  function toCertFormat(data) {
+    var lineLength = 64;
+    var result = "-----BEGIN CERTIFICATE-----\n";
+    for (var i = 0; i < data.length; i += lineLength) {
+      result += i >= data.length - lineLength ? data.substring(i) : data.substring(i, i + lineLength) + "\n";
+    }
+    result += "\n-----END CERTIFICATE-----";
+    return result;
+  }
+
+  function hex2char(hex) {
+    hex = hex.match(/[0-9a-f]{2}/igm);
+    if (!hex) { return ""; }
+
+    hex = hex.map(function(el){
+      return String.fromCharCode(parseInt(el,16));
+    });
+    return hex.join("");
+  }
+
+  function hex2b64(hex) {
+    return btoa(hex2char(hex));
   }
 
   var _proto = SignWisePlugin.prototype;
@@ -240,6 +302,11 @@ if (!Array.prototype.indexOf) {
           result = result.toUpperCase();
         }
         result = result.split(',');
+        if (command !== 'getSupportedHashTypes') {
+          for (var i = 0; i < result.length; i++) {
+            result[i] = toCertFormat(hex2b64(result[i]));
+          }
+        }
       }
       if ((error instanceof TypeError) && command === 'getAuthCertificates') {
         self._run('getAuthenticationCertificate', [], cb);
