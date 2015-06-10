@@ -131,17 +131,9 @@ if (!Array.prototype.indexOf) {
     this.id = Math.random().toString(36).substr(2);
     this.lang = opts.lang;
     this.com = opts.com;
-  }
-
-
-  function toCertFormat(data) {
-    var lineLength = 64;
-    var result = "-----BEGIN CERTIFICATE-----\n";
-    for (var i = 0; i < data.length; i += lineLength) {
-      result += i >= data.length - lineLength ? data.substring(i) : data.substring(i, i + lineLength) + "\n";
-    }
-    result += "\n-----END CERTIFICATE-----";
-    return result;
+    var availableCertFormats = ['base64', 'hex'];
+    this.certFormat = (!opts.certFormat || (-1 === availableCertFormats.indexOf(opts.certFormat)))
+      ? availableCertFormats[0] : opts.certFormat;
   }
 
   function hex2char(hex) {
@@ -156,6 +148,18 @@ if (!Array.prototype.indexOf) {
 
   function hex2b64(hex) {
     return btoa(hex2char(hex));
+  }
+
+  function checkNavigatorPlugin(mimeType) {
+    if (!navigator || !navigator.plugins) {
+      return false;
+    }
+    for (var i = 0; i < navigator.plugins.length; i++) {
+      if (navigator.plugins[i]['0'] && navigator.plugins[i]['0'].type === mimeType) {
+        return true;
+      }
+    }
+    return false;
   }
 
   var _proto = SignWisePlugin.prototype;
@@ -236,12 +240,14 @@ if (!Array.prototype.indexOf) {
       }
       if (!self.isChromeExtension && !self.reGet()) {
         var mime = "application/x-signwiseplugin";
-        var objectTag = '<object id="' + self.id + '" type="' + mime + '" style="width: 1px; height: 1px; position: absolute; visibility: hidden;"></object>';
-        var div = document.createElement("div");
-        div.setAttribute("id", "pluginLocation" + self.id);
-        document.body.appendChild(div);
-        document.getElementById("pluginLocation" + self.id).innerHTML = objectTag;
-        self.reGet();
+        if (!isChrome || checkNavigatorPlugin(mime)) {
+          var objectTag = '<object id="' + self.id + '" type="' + mime + '" style="width: 1px; height: 1px; position: absolute; visibility: hidden;"></object>';
+          var div = document.createElement("div");
+          div.setAttribute("id", "pluginLocation" + self.id);
+          document.body.appendChild(div);
+          document.getElementById("pluginLocation" + self.id).innerHTML = objectTag;
+          self.reGet();
+        }
       }
       setTimeout(function() {
         self.canConnect(function(error, isLoaded) {
@@ -270,6 +276,21 @@ if (!Array.prototype.indexOf) {
           }
         });
       }, 0);
+    }
+  };
+
+  _proto.toCertFormat = function(data) {
+    if (this.certFormat === 'base64') {
+      data = hex2b64(data);
+      var lineLength = 64;
+      var result = "-----BEGIN CERTIFICATE-----\n";
+      for (var i = 0; i < data.length; i += lineLength) {
+        result += i >= data.length - lineLength ? data.substring(i) : data.substring(i, i + lineLength) + "\n";
+      }
+      result += "\n-----END CERTIFICATE-----";
+      return result;
+    } else {
+      return data;
     }
   };
 
@@ -303,7 +324,7 @@ if (!Array.prototype.indexOf) {
         } else {
           result = result.split(';');
           for (var i = 0; i < result.length; i++) {
-            result[i] = toCertFormat(hex2b64(result[i]));
+            result[i] = self.toCertFormat(result[i]);
           }
         }
       }
